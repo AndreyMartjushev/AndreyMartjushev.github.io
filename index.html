@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сканирование текста с карты</title>
+  <style>
+    #camera {
+      display: block;
+      width: 300px; /* Ширина камеры */
+      height: 300px; /* Высота камеры */
+      border: 2px solid #ccc; /* Обводка для камеры */
+    }
+    #photo {
+      display: none;
+      max-width: 300px; /* Максимальная ширина итогового изображения */
+      max-height: 300px; /* Максимальная высота итогового изображения */
+      object-fit: contain; /* Сохраняем пропорции при отображении */
+    }
+    #result {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Сканирование текста с карты</h1>
+  <video id="camera" autoplay></video>
+  <canvas id="canvas" width="300" height="300" style="display:none;"></canvas>
+  <img id="photo" alt="Скриншот">
+  
+  <button id="captureBtn">Сделать фото</button>
+  <button id="resetBtn">Сбросить</button>
+  
+  <div id="result"></div>
+
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+  <script>
+    const video = document.getElementById('camera');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    const photo = document.getElementById('photo');
+    const captureBtn = document.getElementById('captureBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const resultDiv = document.getElementById('result');
+
+    // Доступ к камере
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function (stream) {
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch(function (error) {
+          console.error("Ошибка доступа к камере: ", error);
+          alert("Не удалось получить доступ к камере. Пожалуйста, проверьте разрешения.");
+        });
+    }
+
+    // Когда нажата кнопка "Сделать фото"
+    captureBtn.addEventListener('click', function () {
+      // Копируем кадр с видео на canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Получаем данные изображения из canvas
+      const imageDataURL = canvas.toDataURL('image/png');
+      
+      // Отображаем фото вместо камеры
+      photo.src = imageDataURL;
+      photo.style.display = 'block';
+      video.style.display = 'none';
+      
+      // Запускаем распознавание текста с фото
+      resultDiv.innerHTML = "<p>Распознавание текста, подождите...</p>";
+      
+      Tesseract.recognize(
+        imageDataURL, 'rus', // Язык установлен на русский
+        {
+          logger: m => console.log(m) // Логирование процесса
+        }
+      ).then(({ data: { text, blocks } }) => {
+        resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${text}</p>`;
+        
+        if (blocks.length > 0) {
+          const angle = blocks[0].baseline.angle; // Угол поворота текста
+          
+          // Поворачиваем canvas, если текст не по горизонтали
+          if (Math.abs(angle) > 0.1) {
+            const radians = angle * Math.PI / 180;
+            const newCanvasWidth = Math.abs(canvas.width * Math.cos(radians)) + Math.abs(canvas.height * Math.sin(radians));
+            const newCanvasHeight = Math.abs(canvas.width * Math.sin(radians)) + Math.abs(canvas.height * Math.cos(radians));
+            
+            // Создаем временный canvas для поворота
+            const tempCanvas = document.createElement('canvas');
+            const tempContext = tempCanvas.getContext('2d');
+            tempCanvas.width = newCanvasWidth;
+            tempCanvas.height = newCanvasHeight;
+
+            tempContext.save();
+            tempContext.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+            tempContext.rotate(-radians);
+            tempContext.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+            tempContext.restore();
+
+            // Получаем данные из временного canvas
+            const rotatedImageDataURL = tempCanvas.toDataURL('image/png');
+            photo.src = rotatedImageDataURL;
+          }
+        }
+      }).catch(err => {
+        resultDiv.innerHTML = `<p>Ошибка: ${err.message}</p>`;
+      });
+    });
+
+    // Когда нажата кнопка "Сбросить"
+    resetBtn.addEventListener('click', function () {
+      photo.style.display = 'none'; // Скрываем фото
+      video.style.display = 'block'; // Показываем камеру
+      resultDiv.innerHTML = ''; // Очищаем результаты
+      canvas.width = 300; // Сбрасываем ширину canvas
+      canvas.height = 300; // Сбрасываем высоту canvas
+    });
+  </script>
+</body>
+</html>
