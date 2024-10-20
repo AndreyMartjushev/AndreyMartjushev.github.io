@@ -7,14 +7,12 @@
   <style>
     #camera {
       display: block;
-      width: 300px; 
-      height: 300px; 
       border: 2px solid #ccc; 
     }
     #photo {
       display: none;
-      max-width: 300px; 
-      max-height: 300px; 
+      max-width: 100%; 
+      height: auto; 
       object-fit: cover; 
     }
     #result {
@@ -23,9 +21,9 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты1</h1>
+  <h1>Сканирование текста с карты2</h1>
   <video id="camera" autoplay></video>
-  <canvas id="canvas" width="300" height="300" style="display:none;"></canvas>
+  <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
   
   <button id="captureBtn">Сделать фото</button>
@@ -43,15 +41,13 @@
     const resetBtn = document.getElementById('resetBtn');
     const resultDiv = document.getElementById('result');
 
-    // Функция для определения типа устройства
     function isMobile() {
       return /Mobi|Android/i.test(navigator.userAgent);
     }
 
-    // Определение подходящей камеры
     const videoConstraints = isMobile() 
-      ? { video: { facingMode: { exact: "environment" } } } // Задняя камера для мобильных
-      : { video: true }; // Обычная камера для ПК
+      ? { video: { facingMode: { exact: "environment" } } } 
+      : { video: true };
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia(videoConstraints)
@@ -66,23 +62,14 @@
     }
 
     captureBtn.addEventListener('click', function () {
-      const videoWidth = video.videoWidth;
-      const videoHeight = video.videoHeight;
-      const aspectRatio = videoWidth / videoHeight;
-
-      // Устанавливаем размер канваса с правильным соотношением сторон
-      if (aspectRatio > 1) {
-        canvas.width = 300;
-        canvas.height = 300 / aspectRatio;
-      } else {
-        canvas.height = 300;
-        canvas.width = 300 * aspectRatio;
-      }
+      // Устанавливаем размеры канваса равными размерам видео
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      context.filter = 'contrast(200%) brightness(120%)'; // Применяем фильтры
+      context.filter = 'contrast(200%) brightness(120%)';
       const imageDataURL = canvas.toDataURL('image/png');
-      context.filter = 'none'; // Сбрасываем фильтры
+      context.filter = 'none';
 
       photo.src = imageDataURL;
       photo.style.display = 'block';
@@ -126,8 +113,8 @@
       photo.style.display = 'none';
       video.style.display = 'block';
       resultDiv.innerHTML = '';
-      canvas.width = 300;
-      canvas.height = 300;
+      canvas.width = 0;
+      canvas.height = 0;
     });
   </script>
 </body>
