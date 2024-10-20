@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты2</h1>
+  <h1>Сканирование текста с карты4</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -67,9 +67,7 @@
       canvas.height = video.videoHeight;
 
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      context.filter = 'contrast(200%) brightness(120%)';
       const imageDataURL = canvas.toDataURL('image/png');
-      context.filter = 'none';
 
       photo.src = imageDataURL;
       photo.style.display = 'block';
