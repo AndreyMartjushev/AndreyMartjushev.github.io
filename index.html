@@ -7,15 +7,15 @@
   <style>
     #camera {
       display: block;
-      width: 300px; /* Ширина камеры */
-      height: 300px; /* Высота камеры */
-      border: 2px solid #ccc; /* Обводка для камеры */
+      width: 300px; 
+      height: 300px; 
+      border: 2px solid #ccc; 
     }
     #photo {
       display: none;
-      max-width: 300px; /* Максимальная ширина итогового изображения */
-      max-height: 300px; /* Максимальная высота итогового изображения */
-      object-fit: contain; /* Сохраняем пропорции при отображении */
+      max-width: 300px; 
+      max-height: 300px; 
+      object-fit: cover; 
     }
     #result {
       margin-top: 20px;
@@ -43,11 +43,18 @@
     const resetBtn = document.getElementById('resetBtn');
     const resultDiv = document.getElementById('result');
 
-    // Доступ к камере (основная камера)
+    // Функция для определения типа устройства
+    function isMobile() {
+      return /Mobi|Android/i.test(navigator.userAgent);
+    }
+
+    // Определение подходящей камеры
+    const videoConstraints = isMobile() 
+      ? { video: { facingMode: { exact: "environment" } } } // Задняя камера для мобильных
+      : { video: true }; // Обычная камера для ПК
+
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: "environment" } } // Используем заднюю камеру
-      })
+      navigator.mediaDevices.getUserMedia(videoConstraints)
       .then(function (stream) {
         video.srcObject = stream;
         video.play();
@@ -58,10 +65,25 @@
       });
     }
 
-    // Когда нажата кнопка "Сделать фото"
     captureBtn.addEventListener('click', function () {
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+      const aspectRatio = videoWidth / videoHeight;
+
+      // Устанавливаем размер канваса с правильным соотношением сторон
+      if (aspectRatio > 1) {
+        canvas.width = 300;
+        canvas.height = 300 / aspectRatio;
+      } else {
+        canvas.height = 300;
+        canvas.width = 300 * aspectRatio;
+      }
+
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      context.filter = 'contrast(200%) brightness(120%)'; // Применяем фильтры
       const imageDataURL = canvas.toDataURL('image/png');
+      context.filter = 'none'; // Сбрасываем фильтры
+
       photo.src = imageDataURL;
       photo.style.display = 'block';
       video.style.display = 'none';
@@ -70,9 +92,7 @@
       
       Tesseract.recognize(
         imageDataURL, 'rus',
-        {
-          logger: m => console.log(m)
-        }
+        { logger: m => console.log(m), preserve_interword_spaces: true }
       ).then(({ data: { text, blocks } }) => {
         resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${text}</p>`;
         
@@ -102,7 +122,6 @@
       });
     });
 
-    // Когда нажата кнопка "Сбросить"
     resetBtn.addEventListener('click', function () {
       photo.style.display = 'none';
       video.style.display = 'block';
