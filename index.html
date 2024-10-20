@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты4</h1>
+  <h1>Сканирование текста с карты11</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -40,6 +40,12 @@
     const captureBtn = document.getElementById('captureBtn');
     const resetBtn = document.getElementById('resetBtn');
     const resultDiv = document.getElementById('result');
+
+    // Пример базы данных карточек
+    const cardsDatabase = {
+      "хронос": "В начале хода, если предыдущий ход не был вашим, положите Хроноса из руки в дополнительную колоду, при этом ход немедленно заканчивается. Может быть найден любым поиском (эта особенность работает в колоде).",
+      "вызов на бой": "Может быть в колоде только у любого героя-воина. До начала вашего хода ваш герой должен быть выбран целью каждой атаки противника, если это возможно."
+    };
 
     function isMobile() {
       return /Mobi|Android/i.test(navigator.userAgent);
@@ -62,50 +68,71 @@
     }
 
     captureBtn.addEventListener('click', function () {
-      // Устанавливаем размеры канваса равными размерам видео
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageDataURL = canvas.toDataURL('image/png');
 
-      photo.src = imageDataURL;
-      photo.style.display = 'block';
+      // Применяем фильтры к изображению
+      applyFilters();
+
+      // Отображение фотографии
+      photo.src = imageDataURL; 
+      photo.style.display = 'block'; 
+
       video.style.display = 'none';
 
       resultDiv.innerHTML = "<p>Распознавание текста, подождите...</p>";
       
       Tesseract.recognize(
         imageDataURL, 'rus',
-        { logger: m => console.log(m), preserve_interword_spaces: true }
-      ).then(({ data: { text, blocks } }) => {
-        resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${text}</p>`;
+        {
+          logger: m => console.log(m),
+          tessedit_char_whitelist: 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789 ',
+          preserve_interword_spaces: true
+        }
+      ).then(({ data: { text } }) => {
+        const cleanedText = cleanText(text);
+        resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${cleanedText}</p>`;
         
-        if (blocks.length > 0) {
-          const angle = blocks[0].baseline.angle;
-          if (Math.abs(angle) > 0.1) {
-            const radians = angle * Math.PI / 180;
-            const newCanvasWidth = Math.abs(canvas.width * Math.cos(radians)) + Math.abs(canvas.height * Math.sin(radians));
-            const newCanvasHeight = Math.abs(canvas.width * Math.sin(radians)) + Math.abs(canvas.height * Math.cos(radians));
-            
-            const tempCanvas = document.createElement('canvas');
-            const tempContext = tempCanvas.getContext('2d');
-            tempCanvas.width = newCanvasWidth;
-            tempCanvas.height = newCanvasHeight;
-
-            tempContext.save();
-            tempContext.translate(tempCanvas.width / 2, tempCanvas.height / 2);
-            tempContext.rotate(-radians);
-            tempContext.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-            tempContext.restore();
-
-            photo.src = tempCanvas.toDataURL('image/png');
-          }
+        const matchedCard = findMatchingCard(cleanedText);
+        if (matchedCard) {
+          resultDiv.innerHTML += `<h2>Найдена карточка:</h2><p>${matchedCard}: ${cardsDatabase[matchedCard]}</p>`;
+        } else {
+          resultDiv.innerHTML += `<h2>Совпадений не найдено.</h2>`;
         }
       }).catch(err => {
         resultDiv.innerHTML = `<p>Ошибка: ${err.message}</p>`;
       });
     });
+
+    function cleanText(text) {
+      return text.replace(/[^а-яА-ЯёЁ\s]/g, '').toLowerCase().trim();
+    }
+
+    function findMatchingCard(recognizedText) {
+      for (const cardName in cardsDatabase) {
+        if (recognizedText.includes(cardName)) {
+          return cardName;
+        }
+      }
+      return null;
+    }
+
+    function applyFilters() {
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        data[i] = avg < 128 ? 0 : 255;     // Red
+        data[i + 1] = avg < 128 ? 0 : 255; // Green
+        data[i + 2] = avg < 128 ? 0 : 255; // Blue
+      }
+
+      context.putImageData(imageData, 0, 0);
+    }
 
     resetBtn.addEventListener('click', function () {
       photo.style.display = 'none';
