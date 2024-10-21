@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты вес</h1>
+  <h1>Сканирование текста с карты ключевые слова</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -52,6 +52,8 @@
       .catch(error => {
         console.error("Ошибка загрузки данных карточек:", error);
       });
+
+    const priorityKeywords = ["хронос", "призыв", "существо", "ритуал", "речная дева", "отравить", "поиском", "воина"]; // Ваши ключевые слова
 
     function isMobile() {
       return /Mobi|Android/i.test(navigator.userAgent);
@@ -130,6 +132,9 @@
 
         // Считаем совпадения в названии
         words.forEach(word => {
+          if (priorityKeywords.includes(word)) {
+            score += 3; // Больше вес для ключевых слов
+          }
           if (cardName.includes(word)) score += 2; // Больше вес для имени
           if (cardText.includes(word)) score += 1; // Меньше вес для текста
         });
