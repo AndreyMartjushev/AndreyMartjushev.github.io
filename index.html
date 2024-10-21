@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты 111</h1>
+  <h1>Сканирование текста с карты 222</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -138,8 +138,18 @@
       return text.replace(/[^а-яА-ЯёЁ\s]/g, '').toLowerCase().trim();
     }
 
-    function findBestMatch(recognizedText) {
+    function nGrams(text, n) {
+  const words = text.split(/\s+/).map(word => word.trim()).filter(Boolean);
+  const nGrams = [];
+  for (let i = 0; i <= words.length - n; i++) {
+    nGrams.push(words.slice(i, i + n).join(' '));
+  }
+  return nGrams;
+}
+
+function findBestMatch(recognizedText) {
   const words = recognizedText.split(/\s+/).map(word => word.trim()).filter(Boolean);
+  const recognizedNGrams = nGrams(recognizedText, 2); // Используем биграммы
   let bestMatch = null;
   let highestScore = 0;
 
@@ -157,15 +167,12 @@
       if (cardName.includes(word)) score += 2; // Больше вес для имени
     });
 
-    // Проверка совпадений в тексте
-    const cardTextWords = cardText.split(/\s+/);
-    cardTextWords.forEach(textWord => {
-      words.forEach(word => {
-        const distance = levenshteinDistance(textWord, word);
-        if (distance < 3) { // Настройте порог
-          score += 1; // Меньше вес для текста
-        }
-      });
+    // Проверка совпадений в тексте с использованием N-грамм
+    const cardTextNGrams = nGrams(cardText, 2);
+    recognizedNGrams.forEach(ngram => {
+      if (cardTextNGrams.includes(ngram)) {
+        score += 5; // Больше вес за совпадение биграмм
+      }
     });
 
     // Проверяем, является ли текущая карточка лучшей
@@ -177,6 +184,7 @@
 
   return bestMatch;
 }
+
 
 
     function levenshteinDistance(a, b) {
