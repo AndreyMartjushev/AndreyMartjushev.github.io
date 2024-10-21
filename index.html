@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты11</h1>
+  <h1>Сканирование текста с карты test</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -41,11 +41,17 @@
     const resetBtn = document.getElementById('resetBtn');
     const resultDiv = document.getElementById('result');
 
-    // Пример базы данных карточек
-    const cardsDatabase = {
-      "хронос": "В начале хода, если предыдущий ход не был вашим, положите Хроноса из руки в дополнительную колоду, при этом ход немедленно заканчивается. Может быть найден любым поиском (эта особенность работает в колоде).",
-      "вызов на бой": "Может быть в колоде только у любого героя-воина. До начала вашего хода ваш герой должен быть выбран целью каждой атаки противника, если это возможно."
-    };
+    let cardsDatabase = []; // Хранит карточки
+
+    // Загрузка базы данных карточек из JSON
+    fetch('parser/updated_cards.json')
+      .then(response => response.json())
+      .then(data => {
+        cardsDatabase = data;
+      })
+      .catch(error => {
+        console.error("Ошибка загрузки данных карточек:", error);
+      });
 
     function isMobile() {
       return /Mobi|Android/i.test(navigator.userAgent);
@@ -74,9 +80,6 @@
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageDataURL = canvas.toDataURL('image/png');
 
-      // Применяем фильтры к изображению
-      applyFilters();
-
       // Отображение фотографии
       photo.src = imageDataURL; 
       photo.style.display = 'block'; 
@@ -98,7 +101,13 @@
         
         const matchedCard = findMatchingCard(cleanedText);
         if (matchedCard) {
-          resultDiv.innerHTML += `<h2>Найдена карточка:</h2><p>${matchedCard}: ${cardsDatabase[matchedCard]}</p>`;
+          const cardInfo = cardsDatabase.find(card => card.name.toLowerCase() === matchedCard);
+          if (cardInfo) {
+            resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
+              <p>Имя: ${cardInfo.name}</p>
+              <p>Текст: ${cardInfo.text}</p>
+              <img src="${cardInfo.img}" alt="${cardInfo.name}" style="max-width: 100px;">`;
+          }
         } else {
           resultDiv.innerHTML += `<h2>Совпадений не найдено.</h2>`;
         }
@@ -112,26 +121,12 @@
     }
 
     function findMatchingCard(recognizedText) {
-      for (const cardName in cardsDatabase) {
-        if (recognizedText.includes(cardName)) {
-          return cardName;
+      for (const card of cardsDatabase) {
+        if (recognizedText.includes(card.name.toLowerCase())) {
+          return card.name.toLowerCase();
         }
       }
       return null;
-    }
-
-    function applyFilters() {
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        data[i] = avg < 128 ? 0 : 255;     // Red
-        data[i + 1] = avg < 128 ? 0 : 255; // Green
-        data[i + 2] = avg < 128 ? 0 : 255; // Blue
-      }
-
-      context.putImageData(imageData, 0, 0);
     }
 
     resetBtn.addEventListener('click', function () {
