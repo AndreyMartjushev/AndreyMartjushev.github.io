@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты test1</h1>
+  <h1>Сканирование текста с карты33</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -41,9 +41,8 @@
     const resetBtn = document.getElementById('resetBtn');
     const resultDiv = document.getElementById('result');
 
-    let cardsDatabase = []; // Хранит карточки
+    let cardsDatabase = [];
 
-    // Загрузка базы данных карточек из JSON
     fetch('parser/updated_cards.json')
       .then(response => response.json())
       .then(data => {
@@ -53,23 +52,20 @@
         console.error("Ошибка загрузки данных карточек:", error);
       });
 
-    function isMobile() {
-      return /Mobi|Android/i.test(navigator.userAgent);
-    }
-
+    const isMobile = () => /Mobi|Android/i.test(navigator.userAgent);
     const videoConstraints = isMobile() 
       ? { video: { facingMode: { exact: "environment" } } } 
       : { video: true };
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia(videoConstraints)
-      .then(function (stream) {
+      .then(stream => {
         video.srcObject = stream;
         video.play();
       })
-      .catch(function (error) {
+      .catch(error => {
         console.error("Ошибка доступа к камере: ", error);
-        alert("Не удалось получить доступ к камере. Пожалуйста, проверьте разрешения.");
+        alert("Не удалось получить доступ к камере.");
       });
     }
 
@@ -80,10 +76,8 @@
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageDataURL = canvas.toDataURL('image/png');
 
-      // Отображение фотографии
       photo.src = imageDataURL; 
       photo.style.display = 'block'; 
-
       video.style.display = 'none';
 
       resultDiv.innerHTML = "<p>Распознавание текста, подождите...</p>";
@@ -99,15 +93,12 @@
         const cleanedText = cleanText(text);
         resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${cleanedText}</p>`;
         
-        const matchedCard = findMatchingCard(cleanedText);
+        const matchedCard = findBestMatchingCard(cleanedText);
         if (matchedCard) {
-          const cardInfo = cardsDatabase.find(card => card.name.toLowerCase() === matchedCard);
-          if (cardInfo) {
-            resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
-              <p>Имя: ${cardInfo.name}</p>
-              <p>Текст: ${cardInfo.text}</p>
-              <img src="${cardInfo.img}" alt="${cardInfo.name}" style="max-width: 100px;">`;
-          }
+          resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
+            <p>Имя: ${matchedCard.name}</p>
+            <p>Текст: ${matchedCard.text}</p>
+            <img src="${matchedCard.img}" alt="${matchedCard.name}" style="max-width: 100px;">`;
         } else {
           resultDiv.innerHTML += `<h2>Совпадений не найдено.</h2>`;
         }
@@ -120,21 +111,46 @@
       return text.replace(/[^а-яА-ЯёЁ\s]/g, '').toLowerCase().trim();
     }
 
-    function findMatchingCard(recognizedText) {
-      const recognizedWords = new Set(cleanText(recognizedText).split(' '));
-      let bestMatch = null;
-      let maxMatches = 0;
+    function levenshteinDistance(a, b) {
+      const matrix = [];
 
-      for (const card of cardsDatabase) {
-        const cardWords = new Set(card.name.toLowerCase().split(' '));
-        const matches = [...recognizedWords].filter(word => cardWords.has(word)).length;
+      for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+      }
+      for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+      }
 
-        if (matches > maxMatches) {
-          maxMatches = matches;
-          bestMatch = card.name.toLowerCase();
+      for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+          if (b.charAt(i - 1) === a.charAt(j - 1)) {
+            matrix[i][j] = matrix[i - 1][j - 1];
+          } else {
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j - 1] + 1, // Замена
+              Math.min(matrix[i][j - 1] + 1, // Вставка
+              matrix[i - 1][j] + 1) // Удаление
+            );
+          }
         }
       }
-      return bestMatch;
+
+      return matrix[b.length][a.length];
+    }
+
+    function findBestMatchingCard(recognizedText) {
+      let bestMatch = null;
+      let minDistance = Infinity;
+
+      for (const card of cardsDatabase) {
+        const distance = levenshteinDistance(recognizedText, card.name.toLowerCase());
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestMatch = card;
+        }
+      }
+
+      return minDistance <= 3 ? bestMatch : null; // Учитываем карточки, если расстояние <= 3
     }
 
     resetBtn.addEventListener('click', function () {
