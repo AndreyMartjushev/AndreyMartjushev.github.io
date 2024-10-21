@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты 000</h1>
+  <h1>Сканирование текста с карты 111</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -139,46 +139,45 @@
     }
 
     function findBestMatch(recognizedText) {
-      const words = recognizedText.split(/\s+/).map(word => word.trim()).filter(Boolean);
-      let bestMatch = null;
-      let highestScore = 0;
+  const words = recognizedText.split(/\s+/).map(word => word.trim()).filter(Boolean);
+  let bestMatch = null;
+  let highestScore = 0;
 
-      for (const card of cardsDatabase) {
-        const cardName = card.name ? card.name.toLowerCase() : "";
-        const cardText = card.text ? card.text.toLowerCase() : "";
+  for (const card of cardsDatabase) {
+    const cardName = card.name ? card.name.toLowerCase() : "";
+    const cardText = card.text ? card.text.toLowerCase() : "";
 
-        let score = 0;
+    let score = 0;
 
-        // Проверка совпадений в названии
-        words.forEach(word => {
-          if (priorityKeywords.includes(word)) {
-            score += 3; // Больше вес для ключевых слов
-          }
-          if (cardName.includes(word)) score += 2; // Больше вес для имени
-        });
-
-        // Проверка совпадений в тексте
-        words.forEach(word => {
-          if (cardText.includes(word)) {
-            score += 1; // Меньше вес для текста
-          }
-        });
-
-        // Применение Levenshtein distance
-        const distance = levenshteinDistance(cardName, recognizedText);
-        if (distance < 3) { // Настройте порог
-          score += 5; // Дополнительный вес за близость по символам
-        }
-
-        // Проверяем, является ли текущая карточка лучшей
-        if (score > highestScore) {
-          highestScore = score;
-          bestMatch = card;
-        }
+    // Проверка совпадений в названии
+    words.forEach(word => {
+      if (priorityKeywords.includes(word)) {
+        score += 3; // Больше вес для ключевых слов
       }
+      if (cardName.includes(word)) score += 2; // Больше вес для имени
+    });
 
-      return bestMatch;
+    // Проверка совпадений в тексте
+    const cardTextWords = cardText.split(/\s+/);
+    cardTextWords.forEach(textWord => {
+      words.forEach(word => {
+        const distance = levenshteinDistance(textWord, word);
+        if (distance < 3) { // Настройте порог
+          score += 1; // Меньше вес для текста
+        }
+      });
+    });
+
+    // Проверяем, является ли текущая карточка лучшей
+    if (score > highestScore) {
+      highestScore = score;
+      bestMatch = card;
     }
+  }
+
+  return bestMatch;
+}
+
 
     function levenshteinDistance(a, b) {
       const dp = Array.from({ length: a.length + 1 }, (_, i) => Array(b.length + 1).fill(0));
