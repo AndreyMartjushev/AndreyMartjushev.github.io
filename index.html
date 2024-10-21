@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты 5 с описанием</h1>
+  <h1>Сканирование текста с карты комби</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -99,14 +99,12 @@
         const cleanedText = cleanText(text);
         resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${cleanedText}</p>`;
         
-        const matchedCards = findMatchingCards(cleanedText);
-        if (matchedCards.length > 0) {
-          matchedCards.forEach(card => {
-            resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
-              <p>Имя: ${card.name}</p>
-              <p>Текст: ${card.text}</p>
-              <img src="${card.img}" alt="${card.name}" style="max-width: 100px;">`;
-          });
+        const bestMatch = findBestMatch(cleanedText);
+        if (bestMatch) {
+          resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
+            <p>Имя: ${bestMatch.name}</p>
+            <p>Текст: ${bestMatch.text}</p>
+            <img src="${bestMatch.img}" alt="${bestMatch.name}" style="max-width: 100px;">`;
         } else {
           resultDiv.innerHTML += `<h2>Совпадений не найдено.</h2>`;
         }
@@ -119,23 +117,31 @@
       return text.replace(/[^а-яА-ЯёЁ\s]/g, '').toLowerCase().trim();
     }
 
-    function findMatchingCards(recognizedText) {
+    function findBestMatch(recognizedText) {
       const words = recognizedText.split(/\s+/);
-      const matchedCards = [];
+      let bestMatch = null;
+      let highestScore = 0;
 
       for (const card of cardsDatabase) {
-        const cardName = card.name.toLowerCase();
-        const cardText = card.text.toLowerCase();
+        const cardName = card.name ? card.name.toLowerCase() : "";
+        const cardText = card.text ? card.text.toLowerCase() : "";
         
-        const nameMatch = words.some(word => cardName.includes(word));
-        const textMatch = words.some(word => cardText.includes(word));
-        
-        if (nameMatch || textMatch) {
-          matchedCards.push(card);
+        let score = 0;
+
+        // Считаем совпадения в названии и описании
+        words.forEach(word => {
+          if (cardName.includes(word)) score++;
+          if (cardText.includes(word)) score++;
+        });
+
+        // Проверяем, является ли текущая карточка лучшей
+        if (score > highestScore) {
+          highestScore = score;
+          bestMatch = card;
         }
       }
 
-      return matchedCards;
+      return bestMatch;
     }
 
     resetBtn.addEventListener('click', function () {
