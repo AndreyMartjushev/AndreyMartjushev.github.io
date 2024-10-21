@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты test</h1>
+  <h1>Сканирование текста с карты test1</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -121,12 +121,20 @@
     }
 
     function findMatchingCard(recognizedText) {
+      const recognizedWords = new Set(cleanText(recognizedText).split(' '));
+      let bestMatch = null;
+      let maxMatches = 0;
+
       for (const card of cardsDatabase) {
-        if (recognizedText.includes(card.name.toLowerCase())) {
-          return card.name.toLowerCase();
+        const cardWords = new Set(card.name.toLowerCase().split(' '));
+        const matches = [...recognizedWords].filter(word => cardWords.has(word)).length;
+
+        if (matches > maxMatches) {
+          maxMatches = matches;
+          bestMatch = card.name.toLowerCase();
         }
       }
-      return null;
+      return bestMatch;
     }
 
     resetBtn.addEventListener('click', function () {
