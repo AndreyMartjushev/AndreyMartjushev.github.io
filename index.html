@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты комби</h1>
+  <h1>Сканирование текста с карты вес</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -128,10 +128,10 @@
         
         let score = 0;
 
-        // Считаем совпадения в названии и описании
+        // Считаем совпадения в названии
         words.forEach(word => {
-          if (cardName.includes(word)) score++;
-          if (cardText.includes(word)) score++;
+          if (cardName.includes(word)) score += 2; // Больше вес для имени
+          if (cardText.includes(word)) score += 1; // Меньше вес для текста
         });
 
         // Проверяем, является ли текущая карточка лучшей
