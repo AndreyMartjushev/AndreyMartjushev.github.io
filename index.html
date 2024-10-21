@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты ключевые слова</h1>
+  <h1>Сканирование текста с карты фразы</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -42,6 +42,7 @@
     const resultDiv = document.getElementById('result');
 
     let cardsDatabase = []; // Хранит карточки
+    const priorityKeywords = ["хронос", "существо", "медитация"]; // Пример ключевых слов
 
     // Загрузка базы данных карточек из JSON
     fetch('parser/updated_cards.json')
@@ -52,8 +53,6 @@
       .catch(error => {
         console.error("Ошибка загрузки данных карточек:", error);
       });
-
-    const priorityKeywords = ["хронос", "призыв", "существо", "ритуал", "речная дева", "отравить", "поиском", "воина"]; // Ваши ключевые слова
 
     function isMobile() {
       return /Mobi|Android/i.test(navigator.userAgent);
@@ -85,7 +84,6 @@
       // Отображение фотографии
       photo.src = imageDataURL; 
       photo.style.display = 'block'; 
-
       video.style.display = 'none';
 
       resultDiv.innerHTML = "<p>Распознавание текста, подождите...</p>";
@@ -101,12 +99,12 @@
         const cleanedText = cleanText(text);
         resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${cleanedText}</p>`;
         
-        const bestMatch = findBestMatch(cleanedText);
-        if (bestMatch) {
+        const matchedCard = findBestMatch(cleanedText);
+        if (matchedCard) {
           resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
-            <p>Имя: ${bestMatch.name}</p>
-            <p>Текст: ${bestMatch.text}</p>
-            <img src="${bestMatch.img}" alt="${bestMatch.name}" style="max-width: 100px;">`;
+            <p>Имя: ${matchedCard.name}</p>
+            <p>Текст: ${matchedCard.text}</p>
+            <img src="${matchedCard.img}" alt="${matchedCard.name}" style="max-width: 100px;">`;
         } else {
           resultDiv.innerHTML += `<h2>Совпадений не найдено.</h2>`;
         }
@@ -130,13 +128,20 @@
         
         let score = 0;
 
-        // Считаем совпадения в названии
+        // Проверка совпадений в названии
         words.forEach(word => {
           if (priorityKeywords.includes(word)) {
             score += 3; // Больше вес для ключевых слов
           }
           if (cardName.includes(word)) score += 2; // Больше вес для имени
-          if (cardText.includes(word)) score += 1; // Меньше вес для текста
+        });
+
+        // Проверка совпадений в тексте
+        const textWords = cardText.split(/\s+/);
+        textWords.forEach(textWord => {
+          if (words.includes(textWord)) {
+            score += 1; // Меньше вес для текста
+          }
         });
 
         // Проверяем, является ли текущая карточка лучшей
