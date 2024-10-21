@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты test1</h1>
+  <h1>Сканирование текста с карты 5 с описанием</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -99,15 +99,14 @@
         const cleanedText = cleanText(text);
         resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${cleanedText}</p>`;
         
-        const matchedCard = findMatchingCard(cleanedText);
-        if (matchedCard) {
-          const cardInfo = cardsDatabase.find(card => card.name.toLowerCase() === matchedCard);
-          if (cardInfo) {
+        const matchedCards = findMatchingCards(cleanedText);
+        if (matchedCards.length > 0) {
+          matchedCards.forEach(card => {
             resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
-              <p>Имя: ${cardInfo.name}</p>
-              <p>Текст: ${cardInfo.text}</p>
-              <img src="${cardInfo.img}" alt="${cardInfo.name}" style="max-width: 100px;">`;
-          }
+              <p>Имя: ${card.name}</p>
+              <p>Текст: ${card.text}</p>
+              <img src="${card.img}" alt="${card.name}" style="max-width: 100px;">`;
+          });
         } else {
           resultDiv.innerHTML += `<h2>Совпадений не найдено.</h2>`;
         }
@@ -120,21 +119,23 @@
       return text.replace(/[^а-яА-ЯёЁ\s]/g, '').toLowerCase().trim();
     }
 
-    function findMatchingCard(recognizedText) {
-      const recognizedWords = new Set(cleanText(recognizedText).split(' '));
-      let bestMatch = null;
-      let maxMatches = 0;
+    function findMatchingCards(recognizedText) {
+      const words = recognizedText.split(/\s+/);
+      const matchedCards = [];
 
       for (const card of cardsDatabase) {
-        const cardWords = new Set(card.name.toLowerCase().split(' '));
-        const matches = [...recognizedWords].filter(word => cardWords.has(word)).length;
-
-        if (matches > maxMatches) {
-          maxMatches = matches;
-          bestMatch = card.name.toLowerCase();
+        const cardName = card.name.toLowerCase();
+        const cardText = card.text.toLowerCase();
+        
+        const nameMatch = words.some(word => cardName.includes(word));
+        const textMatch = words.some(word => cardText.includes(word));
+        
+        if (nameMatch || textMatch) {
+          matchedCards.push(card);
         }
       }
-      return bestMatch;
+
+      return matchedCards;
     }
 
     resetBtn.addEventListener('click', function () {
