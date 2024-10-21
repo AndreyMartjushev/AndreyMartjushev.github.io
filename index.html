@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h1>Сканирование текста с карты новый список ключевыхЦ</h1>
+  <h1>Сканирование текста с карты 000</h1>
   <video id="camera" autoplay></video>
   <canvas id="canvas" style="display:none;"></canvas>
   <img id="photo" alt="Скриншот">
@@ -63,6 +63,7 @@
       "стаж", "скрытность", "гнев", "возможность", "уровень", 
       "взаимодействие", "эффекты усиления",
     ];
+
     // Загрузка базы данных карточек из JSON
     fetch('parser/updated_cards.json')
       .then(response => response.json())
@@ -124,7 +125,7 @@
           resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
             <p>Имя: ${matchedCard.name}</p>
             <p>Текст: ${matchedCard.text}</p>
-            <img src="${matchedCard.img}" alt="${matchedCard.name}" style="max-width: 100px;">`;
+            <img src="${matchedCard.img || ''}" alt="${matchedCard.name}" style="max-width: 100px;">`;
         } else {
           resultDiv.innerHTML += `<h2>Совпадений не найдено.</h2>`;
         }
@@ -138,7 +139,7 @@
     }
 
     function findBestMatch(recognizedText) {
-      const words = recognizedText.split(/\s+/);
+      const words = recognizedText.split(/\s+/).map(word => word.trim()).filter(Boolean);
       let bestMatch = null;
       let highestScore = 0;
 
@@ -157,12 +158,17 @@
         });
 
         // Проверка совпадений в тексте
-        const textWords = cardText.split(/\s+/);
-        textWords.forEach(textWord => {
-          if (words.includes(textWord)) {
+        words.forEach(word => {
+          if (cardText.includes(word)) {
             score += 1; // Меньше вес для текста
           }
         });
+
+        // Применение Levenshtein distance
+        const distance = levenshteinDistance(cardName, recognizedText);
+        if (distance < 3) { // Настройте порог
+          score += 5; // Дополнительный вес за близость по символам
+        }
 
         // Проверяем, является ли текущая карточка лучшей
         if (score > highestScore) {
@@ -172,6 +178,27 @@
       }
 
       return bestMatch;
+    }
+
+    function levenshteinDistance(a, b) {
+      const dp = Array.from({ length: a.length + 1 }, (_, i) => Array(b.length + 1).fill(0));
+      for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+      for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+
+      for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+          if (a[i - 1] === b[j - 1]) {
+            dp[i][j] = dp[i - 1][j - 1]; // no operation needed
+          } else {
+            dp[i][j] = Math.min(
+              dp[i - 1][j] + 1, // deletion
+              dp[i][j - 1] + 1, // insertion
+              dp[i - 1][j - 1] + 1 // substitution
+            );
+          }
+        }
+      }
+      return dp[a.length][b.length];
     }
 
     resetBtn.addEventListener('click', function () {
