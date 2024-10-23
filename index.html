@@ -1,220 +1,63 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Сканирование текста с карты</title>
-  <style>
-    #camera {
-      display: block;
-      border: 2px solid #ccc; 
-    }
-    #photo {
-      display: none;
-      max-width: 100%; 
-      height: auto; 
-      object-fit: cover; 
-    }
-    #result {
-      margin-top: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Распознавание карточек</title>
+    <style>
+        video { width: 100%; }
+        canvas { display: none; }
+        #info { margin-top: 20px; }
+        #cardImage { margin-top: 20px; max-width: 100%; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 </head>
 <body>
-  <h1>Сканирование текста с карты 222</h1>
-  <video id="camera" autoplay></video>
-  <canvas id="canvas" style="display:none;"></canvas>
-  <img id="photo" alt="Скриншот">
-  
-  <button id="captureBtn">Сделать фото</button>
-  <button id="resetBtn">Сбросить</button>
-  
-  <div id="result"></div>
+    <h1>Распознавание карточек</h1>
+    <video id="video" autoplay></video>
+    <button id="capture">Сделать снимок</button>
+    <canvas id="canvas"></canvas>
+    <div id="info"></div>
+    <img id="cardImage" src="" alt="Распознанная карточка" />
 
-  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-  <script>
-    const video = document.getElementById('camera');
-    const canvas = document.getElementById('canvas');
-    const context = canvas.getContext('2d');
-    const photo = document.getElementById('photo');
-    const captureBtn = document.getElementById('captureBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const resultDiv = document.getElementById('result');
+    <script>
+        let cards = [];
 
-    let cardsDatabase = []; // Хранит карточки
+        // Загрузка данных карточек из файла
+        fetch('./cards.json')
+            .then(response => response.json())
+            .then(data => {
+                cards = data;
+            })
+            .catch(err => console.error("Ошибка загрузки карточек: ", err));
 
-    // Ключевые слова с большим весом
-    const priorityKeywords = [
-      "хронос", "предыдущий", "ход", "существо", "орда", "удар", "атакует", 
-      "сразиться", "сражение", "найм", "вызовите", "стоимость", "поиск", 
-      "ваше", "существа", "подавление", "рывок", "заклинание", "ранить", 
-      "эффект", "уничтожить", "защита", "медитация", "регенерация", 
-      "гибель", "отравить", "экипировка", "добыть", "кладбище", "жизни", 
-      "контроль", "закрыть", "перемешать", "жажда", "уникальность", "броня", 
-      "превосходство", "спящий", "вампиризм", "засада", "излечение", 
-      "урон", "класс", "мор", "механика", "пожиратель душ", "возвращение", 
-      "возможность атаковать", "влияние", "жертва", "сброс", 
-      "восстановление", "инкарнация", "элементаль", "оглушение", "скорость", 
-      "уникальность", "статистика", "ограничения", "трансформация", 
-      "ресурсы", "взаимодействие", "жизнь", "скидка", "комбинация", 
-      "заклинания", "условия", "особенно", "особенность", "выстрел", 
-      "навыки", "влияние", "эффекты", "карта", "игрок", "тёмный", 
-      "контроль противника", "направленный удар", "жажда", "статусы", 
-      "стаж", "скрытность", "гнев", "возможность", "уровень", 
-      "взаимодействие", "эффекты усиления",
-    ];
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const infoDiv = document.getElementById('info');
+        const cardImage = document.getElementById('cardImage');
 
-    // Загрузка базы данных карточек из JSON
-    fetch('parser/updated_cards.json')
-      .then(response => response.json())
-      .then(data => {
-        cardsDatabase = data;
-      })
-      .catch(error => {
-        console.error("Ошибка загрузки данных карточек:", error);
-      });
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => console.error("Ошибка доступа к камере: ", err));
 
-    function isMobile() {
-      return /Mobi|Android/i.test(navigator.userAgent);
-    }
+        document.getElementById('capture').onclick = async () => {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const image = tf.browser.fromPixels(canvas).toFloat(); // Преобразуем в float32
+            const model = await tf.loadGraphModel('./model/model.json'); // Замените на URL вашей модели
 
-    const videoConstraints = isMobile() 
-      ? { video: { facingMode: { exact: "environment" } } } 
-      : { video: true };
+            const predictions = await model.predict(image.expandDims(0)).data();
+            const detectedCardId = predictions.indexOf(Math.max(...predictions));
 
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia(videoConstraints)
-      .then(function (stream) {
-        video.srcObject = stream;
-        video.play();
-      })
-      .catch(function (error) {
-        console.error("Ошибка доступа к камере: ", error);
-        alert("Не удалось получить доступ к камере. Пожалуйста, проверьте разрешения.");
-      });
-    }
-
-    captureBtn.addEventListener('click', function () {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageDataURL = canvas.toDataURL('image/png');
-
-      // Отображение фотографии
-      photo.src = imageDataURL; 
-      photo.style.display = 'block'; 
-
-      video.style.display = 'none';
-
-      resultDiv.innerHTML = "<p>Распознавание текста, подождите...</p>";
-      
-      Tesseract.recognize(
-        imageDataURL, 'rus',
-        {
-          logger: m => console.log(m),
-          tessedit_char_whitelist: 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789 ',
-          preserve_interword_spaces: true
-        }
-      ).then(({ data: { text } }) => {
-        const cleanedText = cleanText(text);
-        resultDiv.innerHTML = `<h2>Распознанный текст:</h2><p>${cleanedText}</p>`;
-        
-        const matchedCard = findBestMatch(cleanedText);
-        if (matchedCard) {
-          resultDiv.innerHTML += `<h2>Найдена карточка:</h2>
-            <p>Имя: ${matchedCard.name}</p>
-            <p>Текст: ${matchedCard.text}</p>
-            <img src="${matchedCard.img || ''}" alt="${matchedCard.name}" style="max-width: 100px;">`;
-        } else {
-          resultDiv.innerHTML += `<h2>Совпадений не найдено.</h2>`;
-        }
-      }).catch(err => {
-        resultDiv.innerHTML = `<p>Ошибка: ${err.message}</p>`;
-      });
-    });
-
-    function cleanText(text) {
-      return text.replace(/[^а-яА-ЯёЁ\s]/g, '').toLowerCase().trim();
-    }
-
-    function nGrams(text, n) {
-  const words = text.split(/\s+/).map(word => word.trim()).filter(Boolean);
-  const nGrams = [];
-  for (let i = 0; i <= words.length - n; i++) {
-    nGrams.push(words.slice(i, i + n).join(' '));
-  }
-  return nGrams;
-}
-
-function findBestMatch(recognizedText) {
-  const words = recognizedText.split(/\s+/).map(word => word.trim()).filter(Boolean);
-  const recognizedNGrams = nGrams(recognizedText, 2); // Используем биграммы
-  let bestMatch = null;
-  let highestScore = 0;
-
-  for (const card of cardsDatabase) {
-    const cardName = card.name ? card.name.toLowerCase() : "";
-    const cardText = card.text ? card.text.toLowerCase() : "";
-
-    let score = 0;
-
-    // Проверка совпадений в названии
-    words.forEach(word => {
-      if (priorityKeywords.includes(word)) {
-        score += 3; // Больше вес для ключевых слов
-      }
-      if (cardName.includes(word)) score += 2; // Больше вес для имени
-    });
-
-    // Проверка совпадений в тексте с использованием N-грамм
-    const cardTextNGrams = nGrams(cardText, 2);
-    recognizedNGrams.forEach(ngram => {
-      if (cardTextNGrams.includes(ngram)) {
-        score += 5; // Больше вес за совпадение биграмм
-      }
-    });
-
-    // Проверяем, является ли текущая карточка лучшей
-    if (score > highestScore) {
-      highestScore = score;
-      bestMatch = card;
-    }
-  }
-
-  return bestMatch;
-}
-
-
-
-    function levenshteinDistance(a, b) {
-      const dp = Array.from({ length: a.length + 1 }, (_, i) => Array(b.length + 1).fill(0));
-      for (let i = 0; i <= a.length; i++) dp[i][0] = i;
-      for (let j = 0; j <= b.length; j++) dp[0][j] = j;
-
-      for (let i = 1; i <= a.length; i++) {
-        for (let j = 1; j <= b.length; j++) {
-          if (a[i - 1] === b[j - 1]) {
-            dp[i][j] = dp[i - 1][j - 1]; // no operation needed
-          } else {
-            dp[i][j] = Math.min(
-              dp[i - 1][j] + 1, // deletion
-              dp[i][j - 1] + 1, // insertion
-              dp[i - 1][j - 1] + 1 // substitution
-            );
-          }
-        }
-      }
-      return dp[a.length][b.length];
-    }
-
-    resetBtn.addEventListener('click', function () {
-      photo.style.display = 'none';
-      video.style.display = 'block';
-      resultDiv.innerHTML = '';
-      canvas.width = 0;
-      canvas.height = 0;
-    });
-  </script>
+            const card = cards.find(c => c.id === detectedCardId + 1071); // Корректируйте при необходимости
+            if (card) {
+                infoDiv.innerHTML = `<h2>${card.name}</h2><p>${card.text}</p>`;
+                cardImage.src = card.image; // Убедитесь, что в JSON есть поле image с URL изображения
+            } else {
+                infoDiv.innerHTML = "<p>Карточка не найдена.</p>";
+                cardImage.src = ""; // Скрыть изображение, если карточка не найдена
+            }
+        };
+    </script>
 </body>
 </html>
